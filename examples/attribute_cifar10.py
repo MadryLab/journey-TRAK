@@ -3,9 +3,11 @@ from trak import TRAKer
 from diffusion_trak import DiffusionModelOutput
 from diffusion_trak import DiffusionGradientComputer
 from diffusers import UNet2DModel
+from tqdm import tqdm
 from pathlib import Path
 import torch
 import transformers
+import numpy as np
 
 
 @dataclass
@@ -15,6 +17,9 @@ class TrakConfig:
     latent_diffusion: bool = field(default=False)
     vqvae_diffusion: bool = field(default=False)
     batch_size: int = field(default=16)
+    num_timesteps: int = field(default=20)
+    start_timestep: int = field(default=0)
+    end_timestep: int = field(default=1000)
 
 
 @dataclass
@@ -85,3 +90,20 @@ if __name__ == "__main__":
                     proj_dim=config.proj_dim,
                     train_set_size=len(loader_train.indices),
                     device='cuda')
+
+    for model_id, ckpt in enumerate(ckpts):
+        traker.load_checkpoint(ckpt, model_id=model_id)
+
+        for batch in tqdm(loader_train, desc='Computing TRAK embeddings...'):
+            current_bs = batch[0].shape[0]
+            batch = [x.cuda() for x in batch]
+            # we can fix timesteps to be evenly spaced instead, if we want
+            timesteps = np.random.choice(np.arange(trak_config.start_timestep,
+                                                   trak_config.end_timestep),
+                                         size=[current_bs, trak_config.num_timesteps],
+                                         replace=True)
+            batch.append(torch.tensor(timesteps).cuda())
+
+            traker.featurize(batch=batch, num_samples=current_bs)
+
+    traker.finalize_features()
