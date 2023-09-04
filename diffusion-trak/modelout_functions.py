@@ -85,3 +85,67 @@ class DiffusionModelOutputFeaturizing(AbstractModelOutput):
 TASK_TO_MODELOUT = {
     'diffusion_featurizing': DiffusionModelOutputFeaturizing,
 }
+
+
+class DiffusionModelOutputScoringLikelihoodNoise(AbstractModelOutput):
+    def __init__(self, conditional=False, ddim=False, mask=None, delta_t=0) -> None:
+        """
+        For scoring, returns the MSE between the U-net output and the noise
+        added to the on the x_0s (predicted original samples) along the
+        trajectory of the synthesized image.
+        """
+        super().__init__()
+        from diffusers import DDPMScheduler
+
+        self.ddim = ddim
+
+        self.noise_scheduler = DDPMScheduler(num_train_timesteps=1000)
+
+        self.conditional = conditional
+
+        self.mask = mask
+        self.delta_t = delta_t
+
+    def get_output(self,
+                   model,
+                   weights: Iterable[Tensor],
+                   buffers: Iterable[Tensor],
+                   tstep,
+                   noise,
+                   x_0_hats: Tensor = None,  # shape [batch_size, 1000, 3, 32, 32]
+                   label: Tensor = None,  # shape [batch_size]
+                   ):
+
+        noise = noise.unsqueeze(0)
+
+        x0_hat = x_0_hats[tstep].cuda().unsqueeze(0)
+
+        tstep = tstep + self.delta_t
+        if self.ddim:
+            tstep = tstep * 20
+
+        latent = x0_hat
+
+        noisy_latent = self.noise_scheduler.add_noise(latent, noise, tstep)
+
+        if self.conditional:
+            i = np.random.randint(len(label))
+            kwargs = {'encoder_hidden_states': label[i].unsqueeze(0), 'return_dict': False}
+        else:
+            kwargs = {'return_dict': False}
+
+        noise_pred = torch.func.functional_call(model,
+                                                (weights, buffers),
+                                                args=(noisy_latent, tstep.cuda()),
+                                                kwargs=kwargs)[0]
+
+        if self.mask is None:
+
+            return F.mse_loss(noise_pred, noise)
+
+        else:
+            return F.mse_loss(noise_pred*self.mask, noise*self.mask)
+
+    def get_out_to_loss_grad(self, model, weights, buffers, batch):
+        latents, _, __ = batch
+        return torch.ones(latents.shape[0]).to(latents.device).unsqueeze(-1)
