@@ -3,6 +3,8 @@ from trak import TRAKer
 from diffusion_trak import DiffusionModelOutput
 from diffusion_trak import DiffusionGradientComputer
 from diffusers import UNet2DModel
+from datasets import load_dataset
+from torchvision import transforms
 from tqdm import tqdm
 from pathlib import Path
 import torch
@@ -12,25 +14,25 @@ import numpy as np
 
 @dataclass
 class TrakConfig:
-    proj_dim: int = field(default=4096)
+    proj_dim: int = field(default=2048)
     conditional_diffusion: bool = field(default=False)
     latent_diffusion: bool = field(default=False)
     vqvae_diffusion: bool = field(default=False)
-    batch_size: int = field(default=16)
-    num_timesteps: int = field(default=20)
+    num_timesteps: int = field(default=5)
     start_timestep: int = field(default=0)
     end_timestep: int = field(default=1000)
 
 
 @dataclass
 class OtherConfig:
-    dataset_name: str = field(default="CIFAR10")
+    dataset_name: str = field(default="cifar10")
     sample_size: int = field(default=32)
     n_channels: int = field(default=3)
     ckpt_dir: str = field(default="./checkpoints")
+    batch_size: int = field(default=56)
 
 
-def get_model(sample_size, n_channels):
+def get_model(sample_size, n_channels) -> UNet2DModel:
     # Model matching DDPM paper
     model = UNet2DModel(
         sample_size=sample_size,  # the target image resolution
@@ -56,12 +58,40 @@ def get_model(sample_size, n_channels):
     return model.cuda()
 
 
-def get_loaders(config):
-    # TODO
-    pass
+def get_loader(config, split="train"):
+    dataset = load_dataset(config.dataset_name, split=split)
+
+    preprocess = transforms.Compose(
+        [
+            transforms.Resize((config.sample_size, config.sample_size)),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize([0.5], [0.5]),
+        ]
+    )
+
+    # apply image transofmrations on the fly during training
+    def transform(examples) -> dict[str, list]:
+        if config.dataset_name == 'cifar10':
+            images = examples["img"]
+        else:
+            images = examples["image"]
+
+        images = [preprocess(image.convert("RGB")) for image in images]
+
+        # return images
+        return {"images": images}
+
+    dataset.set_transform(transform)
+
+    train_dataloader = torch.utils.data.DataLoader(dataset,
+                                                   batch_size=config.batch_size,
+                                                   shuffle=False)
+
+    return train_dataloader
 
 
-def load_checkpoints_from_dir(ckpt_dir):
+def load_checkpoints_from_dir(ckpt_dir) -> list:
     ckpts = []
     ckpt_dir = Path(ckpt_dir)
     for ckpt_path in sorted(list(ckpt_dir.iterdir())):
@@ -76,7 +106,7 @@ if __name__ == "__main__":
     model = get_model(config.sample_size, config.n_channels)
     model.eval()
 
-    loader_train, loader_test = get_loaders(config)
+    loader_train = get_loader(config, split="train")
 
     ckpts = load_checkpoints_from_dir(config.ckpt_dir)
 
@@ -84,19 +114,27 @@ if __name__ == "__main__":
                                 latent=trak_config.latent_diffusion,
                                 vqvae=trak_config.vqvae_diffusion)
 
+    print(f'Loader length {len(loader_train.dataset)}')
     traker = TRAKer(model=model,
                     task=task,
                     gradient_computer=DiffusionGradientComputer,
-                    proj_dim=config.proj_dim,
-                    train_set_size=len(loader_train.indices),
+                    proj_dim=trak_config.proj_dim,
+                    train_set_size=len(loader_train.dataset),
                     device='cuda')
 
     for model_id, ckpt in enumerate(ckpts):
         traker.load_checkpoint(ckpt, model_id=model_id)
 
         for batch in tqdm(loader_train, desc='Computing TRAK embeddings...'):
-            current_bs = batch[0].shape[0]
+            # batch will consist of [image, label, timestep]
+            current_bs = batch['images'].shape[0]
+
+            # CIFAR-10 is unconditional, so below we are adding a dummy label
+            batch = [batch['images'], torch.tensor([0] * current_bs, dtype=torch.int32)]
+
+            # import ipdb; ipdb.set_trace()  # noqa
             batch = [x.cuda() for x in batch]
+
             # we can fix timesteps to be evenly spaced instead, if we want
             timesteps = np.random.choice(np.arange(trak_config.start_timestep,
                                                    trak_config.end_timestep),
@@ -107,3 +145,8 @@ if __name__ == "__main__":
             traker.featurize(batch=batch, num_samples=current_bs)
 
     traker.finalize_features()
+
+    traker.gradient_computer._are_we_featurizing = False
+    traker.task._are_we_featurizing = False
+
+    loader_val = get_loader(config, split="val")

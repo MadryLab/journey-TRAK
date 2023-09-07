@@ -15,7 +15,7 @@ class DiffusionGradientComputer(AbstractGradientComputer):
         self.model = model
         self.num_params = get_num_params(self.model)
         self.load_model_params(model)
-        self._are_we_featurizing = False
+        self._are_we_featurizing = True
 
     def load_model_params(self, model) -> None:
         """ Given a a torch.nn.Module model, inits/updates the (functional)

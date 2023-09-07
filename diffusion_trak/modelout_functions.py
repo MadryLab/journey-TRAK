@@ -9,7 +9,7 @@ import torch.nn.functional as F
 import torch
 
 
-class DiffusionModelOutputFeaturizing(AbstractModelOutput):
+class DiffusionModelOutput(AbstractModelOutput):
     def __init__(self, conditional=False, latent=False, vqvae=False) -> None:
         """
         Model output function for diffusion models.
@@ -42,13 +42,22 @@ class DiffusionModelOutputFeaturizing(AbstractModelOutput):
                 self.vae.to("cuda", dtype=torch.float16)
                 self.vae.requires_grad_(False)
 
-    def get_output(self,
-                   model,
-                   weights: Iterable[Tensor],
-                   buffers: Iterable[Tensor],
-                   image: Tensor,
-                   label: Tensor,
-                   timestep: Tensor):
+        self._are_we_featurizing = True
+
+    def get_output(self, *args, **kwargs) -> Tensor:
+        if self._are_we_featurizing:
+            return self._get_output_featurizing(*args, **kwargs)
+        else:
+            return self._get_output_scoring(*args, **kwargs)
+
+# class DiffusionModelOutputFeaturizing(AbstractModelOutput):
+    def _get_output_featurizing(self,
+                                model,
+                                weights: Iterable[Tensor],
+                                buffers: Iterable[Tensor],
+                                image: Tensor,
+                                label: Tensor,
+                                timestep: Tensor):
 
         clean_image = image.unsqueeze(0)
 
@@ -77,44 +86,16 @@ class DiffusionModelOutputFeaturizing(AbstractModelOutput):
                                                 kwargs=kwargs)[0]
         return F.mse_loss(noise_pred, noise)
 
-    def get_out_to_loss_grad(self, model, weights, buffers, batch):
-        latents, _, __ = batch
-        return torch.ones(latents.shape[0]).to(latents.device).unsqueeze(-1)
-
-
-TASK_TO_MODELOUT = {
-    'diffusion_featurizing': DiffusionModelOutputFeaturizing,
-}
-
-
-class DiffusionModelOutputScoringLikelihoodNoise(AbstractModelOutput):
-    def __init__(self, conditional=False, ddim=False, mask=None, delta_t=0) -> None:
-        """
-        For scoring, returns the MSE between the U-net output and the noise
-        added to the on the x_0s (predicted original samples) along the
-        trajectory of the synthesized image.
-        """
-        super().__init__()
-        from diffusers import DDPMScheduler
-
-        self.ddim = ddim
-
-        self.noise_scheduler = DDPMScheduler(num_train_timesteps=1000)
-
-        self.conditional = conditional
-
-        self.mask = mask
-        self.delta_t = delta_t
-
-    def get_output(self,
-                   model,
-                   weights: Iterable[Tensor],
-                   buffers: Iterable[Tensor],
-                   tstep,
-                   noise,
-                   x_0_hats: Tensor = None,  # shape [batch_size, 1000, 3, 32, 32]
-                   label: Tensor = None,  # shape [batch_size]
-                   ):
+# class DiffusionModelOutputScoringLikelihoodNoise(AbstractModelOutput):
+    def _get_output_scoring(self,
+                            model,
+                            weights: Iterable[Tensor],
+                            buffers: Iterable[Tensor],
+                            tstep,
+                            noise,
+                            x_0_hats: Tensor = None,  # shape [batch_size, 1000, 3, 32, 32]
+                            label: Tensor = None,  # shape [batch_size]
+                            ):
 
         noise = noise.unsqueeze(0)
 

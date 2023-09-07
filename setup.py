@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 from setuptools import setup
 
-setup(name="diffusion-trak",
+setup(name="diffusion_trak",
       version="1.0.0",
       description="Diffusion TRAK: Data Attribution for Diffusion Models",
       long_description="",
       author="MadryLab",
       author_email='krisgrg@mit.edu',
       license_files=('LICENSE.txt', ),
-      packages=['diffusion-trak'],
+      packages=['diffusion_trak'],
       install_requires=[
           "traker",
           "diffusers",
