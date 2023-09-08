@@ -19,8 +19,8 @@ class TrakConfig:
     latent_diffusion: bool = field(default=False)
     vqvae_diffusion: bool = field(default=False)
     num_timesteps: int = field(default=5)
-    start_timestep: int = field(default=0)
-    end_timestep: int = field(default=1000)
+    start_tstep: int = field(default=0)
+    end_tstep: int = field(default=1000)
 
 
 @dataclass
@@ -122,6 +122,9 @@ if __name__ == "__main__":
                     train_set_size=len(loader_train.dataset),
                     device='cuda')
 
+    traker.gradient_computer._are_we_featurizing = True
+    traker.task._are_we_featurizing = True
+
     for model_id, ckpt in enumerate(ckpts):
         traker.load_checkpoint(ckpt, model_id=model_id)
 
@@ -132,12 +135,11 @@ if __name__ == "__main__":
             # CIFAR-10 is unconditional, so below we are adding a dummy label
             batch = [batch['images'], torch.tensor([0] * current_bs, dtype=torch.int32)]
 
-            # import ipdb; ipdb.set_trace()  # noqa
             batch = [x.cuda() for x in batch]
 
             # we can fix timesteps to be evenly spaced instead, if we want
-            timesteps = np.random.choice(np.arange(trak_config.start_timestep,
-                                                   trak_config.end_timestep),
+            timesteps = np.random.choice(np.arange(trak_config.start_tstep,
+                                                   trak_config.end_tstep),
                                          size=[current_bs, trak_config.num_timesteps],
                                          replace=True)
             batch.append(torch.tensor(timesteps).cuda())
@@ -146,7 +148,27 @@ if __name__ == "__main__":
 
     traker.finalize_features()
 
+    # In case we want to score:
     traker.gradient_computer._are_we_featurizing = False
     traker.task._are_we_featurizing = False
 
-    loader_val = get_loader(config, split="val")
+    loader_val = get_loader(config, split="test")
+
+    ...
+
+    # def assemble_batch(feature_extractor, x_0s, x_ts):
+    # current_bs = x_0s.shape[0]
+    # # we can fix timesteps to be evenly spaced instead, if we want
+    # timesteps = np.random.choice(np.arange(trak_config.start_tstep, trak_config.end_tstep),
+    #                              size=[current_bs, trak_config.num_timesteps_score, 1],
+    #                              replace=True)
+    # timesteps = torch.randint(low=trak_config.start_tstep,
+    #                           high=trak_config.end_tstep,
+    #                           size=(current_bs, trak_config.num_timesteps_score, 1))
+    # timesteps = torch.cat([timesteps, torch.max(torch.tensor(0.), timesteps - 1)], dim=-1).to(torch.long)
+
+    # images = torch.stack([x_0s, x_ts], dim=2)
+
+    # return [images,
+    #         torch.zeros(current_bs),
+    #         timesteps], current_bs

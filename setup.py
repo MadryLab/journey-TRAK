@@ -11,7 +11,9 @@ setup(name="diffusion_trak",
       packages=['diffusion_trak'],
       install_requires=[
           "traker",
-          "diffusers",
+          "diffusers=0.15.1",
+          "transformers",
+          "datasets"
       ],
       extras_require={
           'notebooks':

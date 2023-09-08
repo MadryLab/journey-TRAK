@@ -42,7 +42,7 @@ class DiffusionModelOutput(AbstractModelOutput):
                 self.vae.to("cuda", dtype=torch.float16)
                 self.vae.requires_grad_(False)
 
-        self._are_we_featurizing = True
+        self._are_we_featurizing = False
 
     def get_output(self, *args, **kwargs) -> Tensor:
         if self._are_we_featurizing:
@@ -101,9 +101,9 @@ class DiffusionModelOutput(AbstractModelOutput):
 
         x0_hat = x_0_hats[tstep].cuda().unsqueeze(0)
 
-        tstep = tstep + self.delta_t
-        if self.ddim:
-            tstep = tstep * 20
+        # TODO: either get rid of this, or make it less hardcoded
+        # if self.ddim:
+        #     tstep = tstep * 20
 
         latent = x0_hat
 
@@ -120,12 +120,7 @@ class DiffusionModelOutput(AbstractModelOutput):
                                                 args=(noisy_latent, tstep.cuda()),
                                                 kwargs=kwargs)[0]
 
-        if self.mask is None:
-
-            return F.mse_loss(noise_pred, noise)
-
-        else:
-            return F.mse_loss(noise_pred*self.mask, noise*self.mask)
+        return F.mse_loss(noise_pred, noise)
 
     def get_out_to_loss_grad(self, model, weights, buffers, batch):
         latents, _, __ = batch
