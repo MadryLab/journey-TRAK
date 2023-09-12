@@ -11,7 +11,7 @@ setup(name="diffusion_trak",
       packages=['diffusion_trak'],
       install_requires=[
           "traker",
-          "diffusers=0.15.1",
+          "diffusers==0.15.1",
           "transformers",
           "datasets"
       ],
