@@ -10,7 +10,7 @@ import torch
 
 
 class DiffusionModelOutput(AbstractModelOutput):
-    def __init__(self, conditional=False, latent=False, vqvae=False) -> None:
+    def __init__(self, conditional=False, latent=False) -> None:
         """
         Model output function for diffusion models.
         """
@@ -21,26 +21,14 @@ class DiffusionModelOutput(AbstractModelOutput):
 
         self.conditional = conditional
         self.latent = latent
-        self.vqvae = vqvae
 
         if self.latent:
+            from diffusers import AutoencoderKL
 
-            if self.vqvae:
-
-                from diffusers import VQModel
-
-                self.vae = VQModel.from_pretrained("CompVis/ldm-celebahq-256", subfolder="vqvae")
-                self.vae.to("cuda", dtype=torch.float16)
-                self.vae.requires_grad_(False)
-
-            else:
-
-                from diffusers import AutoencoderKL
-
-                model_id = 'stabilityai/stable-diffusion-2'
-                self.vae = AutoencoderKL.from_pretrained(model_id, subfolder="vae", revision="fp16")
-                self.vae.to("cuda", dtype=torch.float16)
-                self.vae.requires_grad_(False)
+            model_id = 'stabilityai/stable-diffusion-2'
+            self.vae = AutoencoderKL.from_pretrained(model_id, subfolder="vae", revision="fp16")
+            self.vae.to("cuda", dtype=torch.float16)
+            self.vae.requires_grad_(False)
 
         self._are_we_featurizing = False
 
@@ -62,12 +50,9 @@ class DiffusionModelOutput(AbstractModelOutput):
         clean_image = image.unsqueeze(0)
 
         if self.latent:
-            if self.vqvae:
-                latent = self.vae.encode(clean_image).latents
-            else:
-                latent = self.vae.encode(clean_image).latent_dist.sample()
-
+            latent = self.vae.encode(clean_image).latent_dist.sample()
             latent = latent * self.vae.config.scaling_factor
+
         else:
             latent = clean_image
 
@@ -110,8 +95,9 @@ class DiffusionModelOutput(AbstractModelOutput):
         noisy_latent = self.noise_scheduler.add_noise(latent, noise, tstep)
 
         if self.conditional:
-            i = np.random.randint(len(label))
-            kwargs = {'encoder_hidden_states': label[i].unsqueeze(0), 'return_dict': False}
+            # i = np.random.randint(len(label))
+            # kwargs = {'encoder_hidden_states': label[i].unsqueeze(0), 'return_dict': False}
+            kwargs = {'encoder_hidden_states': label, 'return_dict': False}
         else:
             kwargs = {'return_dict': False}
 

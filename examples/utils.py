@@ -7,7 +7,7 @@ import torch
 import os
 
 
-def get_cifar_model(sample_size, n_channels) -> UNet2DModel:
+def get_cifar_model(sample_size, n_channels=3) -> UNet2DModel:
     # Model matching DDPM paper
     model = UNet2DModel(
         sample_size=sample_size,  # the target image resolution
@@ -33,7 +33,7 @@ def get_cifar_model(sample_size, n_channels) -> UNet2DModel:
     return model.cuda()
 
 
-def get_mscoco_model(sample_size, n_channels=4) -> UNet2DModel:
+def get_mscoco_model(sample_size, n_channels=4) -> UNet2DConditionModel:
     sample_size = sample_size // 8
     model = UNet2DConditionModel(
         sample_size=sample_size,  # the target image resolution
@@ -60,7 +60,7 @@ def get_mscoco_model(sample_size, n_channels=4) -> UNet2DModel:
     return model.cuda()
 
 
-def get_cifar_dataloader(batch_size, split="train"):
+def get_cifar_loader(batch_size, split="train"):
     dataset = load_dataset("cifar10", split=split)
 
     preprocess = transforms.Compose(
@@ -82,12 +82,11 @@ def get_cifar_dataloader(batch_size, split="train"):
 
     dataset.set_transform(transform)
 
-    train_dataloader = torch.utils.data.DataLoader(dataset,
-                                                   # batch_size=config.batch_size,
-                                                   batch_size=batch_size,
-                                                   shuffle=False)
+    dataloader = torch.utils.data.DataLoader(dataset,
+                                             batch_size=batch_size,
+                                             shuffle=False)
 
-    return train_dataloader
+    return dataloader
 
 
 def center_crop(image):
@@ -114,6 +113,12 @@ class COCODataset:
         self.coco = COCO(annFile)
         self.img_ids = list(self.coco.imgs.keys())
         self.captions = self.coco.imgToAnns
+        self.preprocess = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Normalize([0.5], [0.5]),
+            ]
+        )
 
     def __getitem__(self, idx):
 
@@ -123,12 +128,24 @@ class COCODataset:
         path = os.path.join(self.imgdir, img_dict['file_name'])
 
         image = Image.open(path).convert('RGB')
-        im = center_crop(image).resize((256, 256))
+        im = center_crop(image).resize((128, 128))
 
         # get captions
         captions = [x['caption'] for x in self.captions[i]]
 
-        return im, captions
+        return self.preprocess(im), captions
 
     def __len__(self):
         return len(self.img_ids)
+
+
+def get_mscoco_loader(batch_size, split='train'):
+    ds = COCODataset(split=split)
+
+    dataloader = torch.utils.data.DataLoader(ds,
+                                             batch_size=batch_size,
+                                             shuffle=False,
+                                             # collate_fn=lambda x: x)
+                                             collate_fn=lambda x: tuple(zip(*x)))
+
+    return dataloader
