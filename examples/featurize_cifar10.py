@@ -19,6 +19,7 @@ class TrakConfig:
     num_timesteps: int = field(default=5)
     start_tstep: int = field(default=0)
     end_tstep: int = field(default=1000)
+    save_dir: str = field(default="./trak_results")
 
 
 @dataclass
@@ -57,13 +58,14 @@ if __name__ == "__main__":
                     task=task,
                     gradient_computer=DiffusionGradientComputer,
                     proj_dim=trak_config.proj_dim,
+                    save_dir=trak_config.save_dir,
                     train_set_size=len(loader_train.dataset),
                     device='cuda')
 
     traker.gradient_computer._are_we_featurizing = True
     traker.task._are_we_featurizing = True
 
-    for model_id, ckpt in enumerate(ckpts):
+    for model_id, ckpt in enumerate(tqdm(ckpts, desc='Iterating over checkpoints...')):
         traker.load_checkpoint(ckpt, model_id=model_id)
 
         for batch in tqdm(loader_train, desc='Computing TRAK embeddings...'):
@@ -90,6 +92,6 @@ if __name__ == "__main__":
     traker.gradient_computer._are_we_featurizing = False
     traker.task._are_we_featurizing = False
 
-    loader_val = get_cifar_loader(config.batch_size, split="test")
+    loader_targets = get_cifar_loader(config.batch_size, split="targets")
 
     ...
