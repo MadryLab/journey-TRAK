@@ -90,77 +90,15 @@ def get_cifar_loader(batch_size, split="train"):
     return dataloader
 
 
-def get_cifar_ffcv_loader(batch_size, split="train",
-                          distributed=False,
-                          num_workers=5,
-                          indices=None,):
-    # ffcv imports
-    from ffcv.fields.rgb_image import CenterCropRGBImageDecoder
-    from ffcv.loader import Loader, OrderOption
-    from ffcv.transforms import Convert, ToTensor, ToDevice, Squeeze, \
-        RandomHorizontalFlip, ToTorchImage
-    from ffcv.fields.basics import IntDecoder
-    paths = {
-        'train': '/mnt/cfs/datasets/ffcv_datasets/cifar10/cifar10_train.beton',
-        'test': '/mnt/cfs/datasets/ffcv_datasets/cifar10/cifar10_test.beton',
-        }
-
-    path = paths[split]
-
-    MEAN = np.array([0.5]) * 255
-    STD = np.array([0.5]) * 255
-    res = 32  # CIFAR-10 has 32x32 images
-
-    decoder = CenterCropRGBImageDecoder((res, res), ratio=1)
-    image_pipeline = [decoder]
-
-    use_flip = (split == 'train')
-    if use_flip:
-        image_pipeline.append(RandomHorizontalFlip())
-
-    image_pipeline += [
-        ToTensor(),
-        ToDevice(torch.device('cuda'), non_blocking=True),
-        ToTorchImage(),
-        Convert(torch.float16),
-        transforms.Normalize(MEAN, STD),
-    ]
-
-    label_pipeline = [
-        IntDecoder(),
-        ToTensor(),
-        Squeeze(),
-        Convert(torch.int64),
-        ToDevice(torch.device('cuda'), non_blocking=True)
-        ]
-
-    loader = Loader(path,
-                    batch_size=batch_size,
-                    num_workers=num_workers,
-                    order=OrderOption.SEQUENTIAL,
-                    indices=indices,
-                    os_cache=True,
-                    drop_last=False,
-                    pipelines={
-                        'image': image_pipeline,
-                        'label': label_pipeline
-                    },
-                    distributed=distributed)
-
-    return loader
-
-    pass
-
-
 def center_crop(image):
 
     width, height = image.size   # Get dimensions
     new_width = new_height = min(width, height)
 
-    left = (width - new_width)/2
-    top = (height - new_height)/2
-    right = (width + new_width)/2
-    bottom = (height + new_height)/2
+    left = (width - new_width) / 2
+    top = (height - new_height) / 2
+    right = (width + new_width) / 2
+    bottom = (height + new_height) / 2
 
     # Crop the center of the image
     image = image.crop((left, top, right, bottom))

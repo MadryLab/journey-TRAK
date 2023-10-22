@@ -8,7 +8,7 @@ import torch
 import transformers
 import numpy as np
 
-from utils import get_cifar_ffcv_loader, get_cifar_model
+from utils import get_cifar_loader, get_cifar_model
 
 
 @dataclass
@@ -34,6 +34,7 @@ class OtherConfig:
 
 def load_checkpoint_from_dir(ckpt_dir, model_id) -> list:
     ckpt_dir = sorted(list(Path(ckpt_dir).iterdir()))
+    print(f'Loading checkpoint from {ckpt_dir[model_id]}')
     return torch.load(ckpt_dir[model_id])
 
 
@@ -44,19 +45,19 @@ if __name__ == "__main__":
     model = get_cifar_model(config.sample_size, config.n_channels)
     model.eval()
 
-    loader_train = get_cifar_ffcv_loader(config.batch_size, split="train")
+    loader_train = get_cifar_loader(config.batch_size, split="train")
     ckpt = load_checkpoint_from_dir(config.ckpt_dir, config.model_id)
 
     task = DiffusionModelOutput(conditional=trak_config.conditional_diffusion,
                                 latent=trak_config.latent_diffusion)
 
-    print(f'Loader length {len(loader_train.indices)}')
+    print(f'Loader length {len(loader_train.dataset)}')
     traker = TRAKer(model=model,
                     task=task,
                     gradient_computer=DiffusionGradientComputer,
                     proj_dim=trak_config.proj_dim,
                     save_dir=trak_config.save_dir,
-                    train_set_size=len(loader_train.indices),
+                    train_set_size=len(loader_train.dataset),
                     load_from_save_dir=(config.model_id == 0),
                     device='cuda')
 
@@ -67,10 +68,10 @@ if __name__ == "__main__":
 
     for batch in tqdm(loader_train, desc='Computing TRAK embeddings...'):
         # batch will consist of [image, label, timestep]
-        current_bs = batch[0].shape[0]
+        current_bs = batch['images'].shape[0]
 
         # CIFAR-10 is unconditional, so below we are adding a dummy label
-        batch = [batch[0], torch.tensor([0] * current_bs, dtype=torch.int32)]
+        batch = [batch['images'], torch.tensor([0] * current_bs, dtype=torch.int32)]
         batch = [x.cuda() for x in batch]
         # we can fix timesteps to be evenly spaced instead, if we want
         timesteps = np.random.choice(np.arange(trak_config.start_tstep,
