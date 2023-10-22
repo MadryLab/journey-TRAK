@@ -5,7 +5,6 @@ from pycocotools.coco import COCO
 from PIL import Image
 import torch
 import os
-import numpy as np
 
 
 def get_cifar_model(sample_size, n_channels=3) -> UNet2DModel:
