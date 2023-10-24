@@ -34,7 +34,7 @@ class TrakConfig:
 @dataclass
 class OtherConfig:
     dataset_name: str = field(default="mscoco")
-    sample_size: int = field(default=256)
+    sample_size: int = field(default=128)
     n_channels: int = field(default=4)
     ckpt_dir: str = field(default="./mscoco_checkpoints")
     batch_size: int = field(default=32)
@@ -44,7 +44,7 @@ class OtherConfig:
 def load_checkpoints_from_dir(ckpt_dir, model_id) -> list:
     ckpt_dir = sorted(list(Path(ckpt_dir).iterdir()))
     try:
-        ckpt_path = ckpt_dir[model_id].joinpath('checkpoints/checkpoint-15/pytorch_model.bin')
+        ckpt_path = ckpt_dir[model_id].joinpath('checkpoints/checkpoint-200/pytorch_model.bin')
         print(f'Loading checkpoint from {ckpt_path}')
         return torch.load(ckpt_path)
     except:  # noqa
