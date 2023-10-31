@@ -25,7 +25,7 @@ class TrakConfig:
     proj_dim: int = field(default=2048)
     conditional_diffusion: bool = field(default=True)
     latent_diffusion: bool = field(default=True)
-    num_timesteps: int = field(default=5)
+    num_timesteps: int = field(default=20)
     start_tstep: int = field(default=0)
     end_tstep: int = field(default=1000)
     save_dir: str = field(default='./trak_results_mscoco')

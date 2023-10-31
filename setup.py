@@ -10,7 +10,7 @@ setup(name="diffusion_trak",
       license_files=('LICENSE.txt', ),
       packages=['diffusion_trak'],
       install_requires=[
-          "traker",
+          "traker>=0.2.2",
           "diffusers==0.15.1",
           "transformers",
           "datasets"

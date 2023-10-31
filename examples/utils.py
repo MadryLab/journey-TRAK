@@ -16,7 +16,12 @@ def get_cifar_model(sample_size, n_channels=3) -> UNet2DModel:
         in_channels=n_channels,  # the number of input channels, 3 for RGB images
         out_channels=n_channels,  # the number of output channels
         layers_per_block=2,  # how many ResNet layers to use per UNet block
-        block_out_channels=(128, 256, 256, 256),  # the number of output channes for each UNet block
+        block_out_channels=(
+            128,
+            256,
+            256,
+            256,
+        ),  # the number of output channes for each UNet block
         down_block_types=(
             "DownBlock2D",  # a regular ResNet downsampling block
             "AttnDownBlock2D",  # a ResNet downsampling block with spatial self-attention
@@ -27,8 +32,8 @@ def get_cifar_model(sample_size, n_channels=3) -> UNet2DModel:
             "UpBlock2D",  # a regular ResNet upsampling block
             "UpBlock2D",
             "AttnUpBlock2D",  # a ResNet upsampling block with spatial self-attention
-            "UpBlock2D"
-            ),
+            "UpBlock2D",
+        ),
         attention_head_dim=None,
     )
 
@@ -42,20 +47,25 @@ def get_mscoco_model(sample_size, n_channels=4) -> UNet2DConditionModel:
         in_channels=n_channels,  # the number of input channels, 3 for RGB images
         out_channels=n_channels,  # the number of output channels
         layers_per_block=2,  # how many ResNet layers to use per UNet block
-        block_out_channels=(128, 256, 256, 256),  # the number of output channels for each UNet block
+        block_out_channels=(
+            128,
+            256,
+            256,
+            256,
+        ),  # the number of output channels for each UNet block
         cross_attention_dim=1024,  # NOTE: 1024 for V2,
         down_block_types=(
             "CrossAttnDownBlock2D",
             "CrossAttnDownBlock2D",
             "CrossAttnDownBlock2D",
-            "DownBlock2D"
+            "DownBlock2D",
         ),
         up_block_types=(
             "UpBlock2D",
             "CrossAttnUpBlock2D",
             "CrossAttnUpBlock2D",
-            "CrossAttnUpBlock2D"
-            ),
+            "CrossAttnUpBlock2D",
+        ),
         attention_head_dim=8,
     )
 
@@ -84,16 +94,15 @@ def get_cifar_loader(batch_size, split="train"):
 
     dataset.set_transform(transform)
 
-    dataloader = torch.utils.data.DataLoader(dataset,
-                                             batch_size=batch_size,
-                                             shuffle=False)
+    dataloader = torch.utils.data.DataLoader(
+        dataset, batch_size=batch_size, shuffle=False
+    )
 
     return dataloader
 
 
 def center_crop(image):
-
-    width, height = image.size   # Get dimensions
+    width, height = image.size  # Get dimensions
     new_width = new_height = min(width, height)
 
     left = (width - new_width) / 2
@@ -108,10 +117,10 @@ def center_crop(image):
 
 
 class COCODataset:
-    def __init__(self, path='/mnt/xfs/datasets/coco2017', split='train'):
-        dataType = f'{split}2017'
-        annFile = os.path.join(path, 'annotations', f"captions_{dataType}.json")
-        self.imgdir = os.path.join(path, 'images', dataType)
+    def __init__(self, path="/mnt/xfs/datasets/coco2017", split="train"):
+        dataType = f"{split}2017"
+        annFile = os.path.join(path, "annotations", f"captions_{dataType}.json")
+        self.imgdir = os.path.join(path, "images", dataType)
         self.coco = COCO(annFile)
         self.img_ids = list(self.coco.imgs.keys())
         self.captions = self.coco.imgToAnns
@@ -123,17 +132,16 @@ class COCODataset:
         )
 
     def __getitem__(self, idx):
-
         # get image
         i = self.img_ids[idx]
         img_dict = self.coco.loadImgs([i])[0]
-        path = os.path.join(self.imgdir, img_dict['file_name'])
+        path = os.path.join(self.imgdir, img_dict["file_name"])
 
-        image = Image.open(path).convert('RGB')
+        image = Image.open(path).convert("RGB")
         im = center_crop(image).resize((128, 128))
 
         # get captions
-        captions = [x['caption'] for x in self.captions[i]]
+        captions = [x["caption"] for x in self.captions[i]]
 
         return self.preprocess(im), captions
 
@@ -141,14 +149,16 @@ class COCODataset:
         return len(self.img_ids)
 
 
-def get_mscoco_loader(batch_size, split='train'):
+def get_mscoco_loader(batch_size, split="train"):
     ds = COCODataset(split=split)
 
-    dataloader = torch.utils.data.DataLoader(ds,
-                                             batch_size=batch_size,
-                                             shuffle=False,
-                                             # collate_fn=lambda x: x)
-                                             collate_fn=lambda x: tuple(zip(*x)))
+    dataloader = torch.utils.data.DataLoader(
+        ds,
+        batch_size=batch_size,
+        shuffle=False,
+        # collate_fn=lambda x: x)
+        collate_fn=lambda x: tuple(zip(*x)),
+    )
 
     return dataloader
 
@@ -157,7 +167,7 @@ def get_mscoco_loader(batch_size, split='train'):
 def run_mscoco_pipe(
     self,
     prompt: Union[str, List[str]] = None,
-    start_from = -1,
+    start_from=-1,
     height: Optional[int] = None,
     width: Optional[int] = None,
     num_inference_steps: int = 50,
@@ -174,7 +184,7 @@ def run_mscoco_pipe(
     callback: Optional[Callable[[int, int, torch.FloatTensor], None]] = None,
     callback_steps: int = 1,
     cross_attention_kwargs: Optional[Dict[str, Any]] = None,
-    verbose=True
+    verbose=True,
 ):
     # 0. Default height and width to unet
     height = height or self.unet.config.sample_size * self.vae_scale_factor
@@ -182,7 +192,13 @@ def run_mscoco_pipe(
 
     # 1. Check inputs. Raise error if not correct
     self.check_inputs(
-        prompt, height, width, callback_steps, negative_prompt, prompt_embeds, negative_prompt_embeds
+        prompt,
+        height,
+        width,
+        callback_steps,
+        negative_prompt,
+        prompt_embeds,
+        negative_prompt_embeds,
     )
 
     # 2. Define call parameters
@@ -234,22 +250,16 @@ def run_mscoco_pipe(
     inputs = [latents.detach().clone().cpu()]
 
     # 7. Denoising loop
-    num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
-    if verbose:
-        f = tqdm
-    else:
-        f = lambda x: x
-
     for i in tqdm(range(len(timesteps))):
-
         t = timesteps[i]
 
         if start_from > 0 and t > start_from:
             continue
 
-
         # expand the latents if we are doing classifier free guidance
-        latent_model_input = torch.cat([latents] * 2) if do_classifier_free_guidance else latents
+        latent_model_input = (
+            torch.cat([latents] * 2) if do_classifier_free_guidance else latents
+        )
         latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
         # predict the noise residual
@@ -263,7 +273,9 @@ def run_mscoco_pipe(
         # perform guidance
         if do_classifier_free_guidance:
             noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-            noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+            noise_pred = noise_pred_uncond + guidance_scale * (
+                noise_pred_text - noise_pred_uncond
+            )
 
         # compute the previous noisy sample x_t -> x_t-1
         out = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs)
@@ -274,11 +286,12 @@ def run_mscoco_pipe(
 
         inputs.append(latents.detach().clone().cpu())
 
-
     image = self.decode_latents(latents)
 
     # 9. Run safety checker
-    image, has_nsfw_concept = self.run_safety_checker(image, device, prompt_embeds.dtype)
+    image, has_nsfw_concept = self.run_safety_checker(
+        image, device, prompt_embeds.dtype
+    )
 
     # 10. Convert to PIL
     image = self.numpy_to_pil(image)

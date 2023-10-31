@@ -35,7 +35,7 @@ def vectorize(g, arr) -> Tensor:
             num_param = param[0].numel()
             p = param.flatten(start_dim=1).data
 
-        arr[:, pointer:pointer + num_param] = p
+        arr[:, pointer : pointer + num_param] = p
         pointer += num_param
 
 
@@ -54,5 +54,5 @@ def _accumulate_vectorize(g, arr) -> Tensor:
     pointer = 0
     for param in g.values():
         num_param = param[0].numel()
-        arr[:, pointer:pointer + num_param] += param.flatten(start_dim=1).data
+        arr[:, pointer : pointer + num_param] += param.flatten(start_dim=1).data
         pointer += num_param

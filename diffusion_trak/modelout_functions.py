@@ -25,8 +25,10 @@ class DiffusionModelOutput(AbstractModelOutput):
         if self.latent:
             from diffusers import AutoencoderKL
 
-            model_id = 'stabilityai/stable-diffusion-2'
-            self.vae = AutoencoderKL.from_pretrained(model_id, subfolder="vae", revision="fp16")
+            model_id = "stabilityai/stable-diffusion-2"
+            self.vae = AutoencoderKL.from_pretrained(
+                model_id, subfolder="vae", revision="fp16"
+            )
             self.vae.to("cuda", dtype=torch.float16)
             self.vae.requires_grad_(False)
 
@@ -38,15 +40,16 @@ class DiffusionModelOutput(AbstractModelOutput):
         else:
             return self._get_output_scoring(*args, **kwargs)
 
-# class DiffusionModelOutputFeaturizing(AbstractModelOutput):
-    def _get_output_featurizing(self,
-                                model,
-                                weights: Iterable[Tensor],
-                                buffers: Iterable[Tensor],
-                                image: Tensor,
-                                label: Tensor,
-                                timestep: Tensor):
-
+    # class DiffusionModelOutputFeaturizing(AbstractModelOutput):
+    def _get_output_featurizing(
+        self,
+        model,
+        weights: Iterable[Tensor],
+        buffers: Iterable[Tensor],
+        image: Tensor,
+        label: Tensor,
+        timestep: Tensor,
+    ):
         clean_image = image.unsqueeze(0)
 
         if self.latent:
@@ -60,51 +63,47 @@ class DiffusionModelOutput(AbstractModelOutput):
         noisy_latent = self.noise_scheduler.add_noise(latent, noise, timestep)
 
         if self.conditional:
+            # MS COCO has 5 labels per image
             i = np.random.randint(len(label))
-            kwargs = {'encoder_hidden_states': label[i].unsqueeze(0), 'return_dict': False}
+            kwargs = {
+                "encoder_hidden_states": label[i].unsqueeze(0),
+                "return_dict": False,
+            }
         else:
-            kwargs = {'return_dict': False}
+            kwargs = {"return_dict": False}
 
-        noise_pred = torch.func.functional_call(model,
-                                                (weights, buffers),
-                                                args=(noisy_latent, timestep),
-                                                kwargs=kwargs)[0]
+        noise_pred = torch.func.functional_call(
+            model, (weights, buffers), args=(noisy_latent, timestep), kwargs=kwargs
+        )[0]
         return F.mse_loss(noise_pred, noise)
 
-# class DiffusionModelOutputScoringLikelihoodNoise(AbstractModelOutput):
-    def _get_output_scoring(self,
-                            model,
-                            weights: Iterable[Tensor],
-                            buffers: Iterable[Tensor],
-                            tstep,
-                            noise,
-                            x_0_hats: Tensor = None,  # shape [batch_size, 1000, 3, 32, 32]
-                            label: Tensor = None,  # shape [batch_size]
-                            ):
-
+    # class DiffusionModelOutputScoringLikelihoodNoise(AbstractModelOutput):
+    def _get_output_scoring(
+        self,
+        model,
+        weights: Iterable[Tensor],
+        buffers: Iterable[Tensor],
+        tstep,
+        noise,
+        x_0_hats: Tensor = None,  # shape [batch_size, 1000, 3, 32, 32]
+        label: Tensor = None,  # shape [batch_size]
+    ):
         noise = noise.unsqueeze(0)
 
         x0_hat = x_0_hats[tstep].cuda().unsqueeze(0)
-
-        # TODO: either get rid of this, or make it less hardcoded
-        # if self.ddim:
-        #     tstep = tstep * 20
 
         latent = x0_hat
 
         noisy_latent = self.noise_scheduler.add_noise(latent, noise, tstep)
 
         if self.conditional:
-            # i = np.random.randint(len(label))
-            # kwargs = {'encoder_hidden_states': label[i].unsqueeze(0), 'return_dict': False}
-            kwargs = {'encoder_hidden_states': label, 'return_dict': False}
+            kwargs = {"encoder_hidden_states": label, "return_dict": False}
         else:
-            kwargs = {'return_dict': False}
+            kwargs = {"return_dict": False}
 
-        noise_pred = torch.func.functional_call(model,
-                                                (weights, buffers),
-                                                args=(noisy_latent, tstep.cuda()),
-                                                kwargs=kwargs)[0]
+        noise_pred = torch.func.functional_call(
+            model, (weights, buffers), args=(noisy_latent, tstep.cuda()), kwargs=kwargs
+        )[0]
 
         return F.mse_loss(noise_pred, noise)
 
