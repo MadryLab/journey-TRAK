@@ -158,7 +158,7 @@ def load_checkpoints(dataset, root) -> list:
 def load_trak_results(dataset, root):
     dataset_to_url = {
         "CIFAR10": "https://www.dropbox.com/sh/k2ndo039iuiik9e/AACRIh_BwF6v4Y2Y20ySmLaQa?dl=1",
-        "MSCOCO": "https://www.dropbox.com/sh/96bnkq2henou5bc/AAC15FwitnE8s63TzjkKUPfxa?dl=1",
+        "MSCOCO": "https://www.dropbox.com/sh/p6eujiigdi8xrb1/AABw1idEeZgXI7SlI9XnDVQta?dl=1",
     }
 
     NAME = f"{dataset}_trak_results.zip"
